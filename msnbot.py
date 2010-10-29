@@ -253,9 +253,9 @@ def main():
 		curWho = getWho()
 		if len(curWho) != len(preWho):
 			if len(curWho) > len(preWho):
-				b.send_msg('msn@zhangwenjin.com', ','.join(curWho - preWho) + ' has logout')
+				b.send_msg('msn@zhangwenjin.com', ','.join(curWho - preWho) + ' has login')
 			else:
-				b.send_msg('msn@zhangwenjin.com', ','.join(preWho - curWho) + ' has login')
+				b.send_msg('msn@zhangwenjin.com', ','.join(preWho - curWho) + ' has logout')
 
 			preWho = curWho
 

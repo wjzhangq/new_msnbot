@@ -103,6 +103,7 @@ class msnbot:
 					else:
 						self.m.read(i)
 				except (msnlib.SocketError, socket.error), err:
+					import traceback
 					traceback.print_last()
 					if i != self.m:
 						self.m.close(i)

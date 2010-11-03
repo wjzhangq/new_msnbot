@@ -109,6 +109,8 @@ class msnbot:
 						self.m.close(i)
 					else:
 						return
+				except (Exception), err:
+					print err
 	
 	def bgloop(self):
 		'''backgroup loop'''

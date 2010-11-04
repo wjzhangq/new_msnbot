@@ -111,6 +111,9 @@ class msnbot:
 						return
 				except (Exception), err:
 					print err
+				except:
+					print 'some erero raise'
+					print sys.exc_info()
 	
 	def bgloop(self):
 		'''backgroup loop'''

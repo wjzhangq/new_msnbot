@@ -89,31 +89,37 @@ class msnbot:
 		return self.m.pollable()
 	
 	def loop(self):
-		while True:
-			infd, outfd = self.get_pollable_fds()
-			infd.append(self.inp)
-			fds = select.select(infd, outfd, [], 1)
-			for i in fds[0] + fds[1]:
-				try:
-					if i == self.inp:
-						msgStr =  os.read(self.inp, 10240)
-						email, body = msgStr.split(':', 1)
-						r = self.m.sendmsg(email, body)
-						os.write(self.outm, '%s' % (r,))
-					else:
-						self.m.read(i)
-				except (msnlib.SocketError, socket.error), err:
-					import traceback
-					traceback.print_last()
-					if i != self.m:
-						self.m.close(i)
-					else:
-						return
-				except (Exception), err:
-					print err
-				except:
-					print 'some erero raise'
-					print sys.exc_info()
+		try:
+			while True:
+				infd, outfd = self.get_pollable_fds()
+				infd.append(self.inp)
+				fds = select.select(infd, outfd, [], 1)
+				for i in fds[0] + fds[1]:
+					try:
+						if i == self.inp:
+							msgStr =  os.read(self.inp, 10240)
+							email, body = msgStr.split(':', 1)
+							r = self.m.sendmsg(email, body)
+							os.write(self.outm, '%s' % (r,))
+						else:
+							self.m.read(i)
+					except (msnlib.SocketError, socket.error), err:
+						import traceback
+						traceback.print_last()
+						if i != self.m:
+							self.m.close(i)
+						else:
+							return
+					except (Exception), err:
+						print err
+					except:
+						print 'some erero raise'
+						print sys.exc_info()
+		except (Exception), err:
+			print er
+		except:
+			print 'end some erero raise'
+			print sys.exc_info()
 	
 	def bgloop(self):
 		'''backgroup loop'''

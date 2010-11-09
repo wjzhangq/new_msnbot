@@ -142,12 +142,18 @@ class msnbot:
 			self.m.sendmsg(email, '\r\n'.join(reply))
 	
 	def send_msg(self, email, msg):
+		if email not in self.m.users:
+			return  '%s is not your friend, please add it first' % email
+		
+		if self.m.users[email].status == 'FLN':
+			return '%s is offline, please try later'
+		
 		os.write(self.outp, email + ':' + msg)
 		r = os.read(self.inm, 1024)
 		if r == '1':
-			ret =  'Message for %s queued for delivery' % email
+			ret =  'ok Message for %s queued for delivery' % email
 		elif r == '2':
-			ret = 'Message for %s delivery' % email
+			ret = 'ok Message for %s delivery' % email
 		elif r == '-2':
 			ret = 'Message too big'
 		else:
@@ -265,9 +271,9 @@ def main():
 		curWho = getWho()
 		if len(curWho) != len(preWho):
 			if len(curWho) > len(preWho):
-				b.send_msg('msn@zhangwenjin.com', ','.join(curWho - preWho) + ' has login')
+				print b.send_msg('msn@zhangwenjin.com', ','.join(curWho - preWho) + ' has login')
 			else:
-				b.send_msg('msn@zhangwenjin.com', ','.join(preWho - curWho) + ' has logout')
+				print b.send_msg('msn@zhangwenjin.com', ','.join(preWho - curWho) + ' has logout')
 
 			preWho = curWho
 

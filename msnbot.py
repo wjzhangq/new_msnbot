@@ -116,7 +116,7 @@ class msnbot:
 						print 'some erero raise'
 						print sys.exc_info()
 		except (Exception), err:
-			print er
+			print err
 		except:
 			print 'end some erero raise'
 			print sys.exc_info()

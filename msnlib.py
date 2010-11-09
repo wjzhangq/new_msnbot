@@ -83,8 +83,8 @@ class user:
 		self.lists = []
 
 	def __repr__(self):
-		return '<user email:%s nick:"%s" gid:%s>' % (self.email,
-				self.nick, self.gid)
+		return '<user email:%s nick:"%s" gid:%s status:%s online:%s>' % (self.email,
+				self.nick, self.gid, self.status, self.online)
 
 
 class sbd:

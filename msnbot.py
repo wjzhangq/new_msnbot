@@ -8,6 +8,7 @@ import select
 import socket
 import thread
 import commands
+import traceback
 
 import msnlib
 import msncb
@@ -105,7 +106,10 @@ class msnbot:
 							self.m.read(i)
 					except (msnlib.SocketError, socket.error), err:
 						import traceback
-						traceback.print_last()
+						exc_type, exc_value, exc_traceback = sys.exc_info()
+						traceback.print_tb(exc_traceback, limit=1, file=sys.stdout)
+						traceback.print_exception(exc_type, exc_value, exc_traceback,limit=2, file=sys.stdout)
+						traceback.print_exc()
 						if i != self.m:
 							self.m.close(i)
 						else:
@@ -114,12 +118,18 @@ class msnbot:
 						print err
 					except:
 						print 'some erero raise'
-						print sys.exc_info()
+						exc_type, exc_value, exc_traceback = sys.exc_info()
+						traceback.print_tb(exc_traceback, limit=1, file=sys.stdout)
+						traceback.print_exception(exc_type, exc_value, exc_traceback,limit=2, file=sys.stdout)
+						traceback.print_exc()
 		except (Exception), err:
 			print err
 		except:
 			print 'end some erero raise'
-			print sys.exc_info()
+			exc_type, exc_value, exc_traceback = sys.exc_info()
+			traceback.print_tb(exc_traceback, limit=1, file=sys.stdout)
+			traceback.print_exception(exc_type, exc_value, exc_traceback,limit=2, file=sys.stdout)
+			traceback.print_exc()
 	
 	def bgloop(self):
 		'''backgroup loop'''
@@ -146,7 +156,7 @@ class msnbot:
 			return  '%s is not your friend, please add it first' % email
 		
 		if self.m.users[email].status == 'FLN':
-			return '%s is offline, please try later'
+			return '%s is offline, please try later' % email
 		
 		os.write(self.outp, email + ':' + msg)
 		r = os.read(self.inm, 1024)

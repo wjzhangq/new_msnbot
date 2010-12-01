@@ -6,9 +6,20 @@ import os.path
 import time
 import select
 import socket
-import thread
+import threading
 import commands
 import traceback
+import signal
+import ringQueue
+
+
+def cur_file_dir():
+	path = sys.path[0]
+	if os.path.isdir(path):
+		return path
+	elif os.path.isfile(path):
+		return os.path.dirname(path)
+
 
 import msnlib
 import msncb
@@ -43,6 +54,7 @@ class msnbot:
 		self.msg_handlers = []
 		self.inp, self.outp = os.pipe()
 		self.inm, self.outm = os.pipe()
+		self.recvRing = ringQueue.ringQueue(20)
 	
 	def _setup(self):
 		self.m = msnlib.msnd()
@@ -87,13 +99,14 @@ class msnbot:
 				self.m.useradd(email, email)
 	
 	def get_pollable_fds(self):
-		return self.m.pollable()
+		inf = self.m.pollable()
+		inf[0].append(self.inp)
+		return inf
 	
 	def loop(self):
 		try:
 			while True:
 				infd, outfd = self.get_pollable_fds()
-				infd.append(self.inp)
 				fds = select.select(infd, outfd, [], 1)
 				for i in fds[0] + fds[1]:
 					try:
@@ -133,8 +146,7 @@ class msnbot:
 	
 	def bgloop(self):
 		'''backgroup loop'''
-		thread.start_new_thread(self.loop, ())
-		
+		threading.Thread(name="msn loop thread", target=self.loop).start()
 
 	def register_msg_handler(self, f):
 		"Registers a message handler"
@@ -142,9 +154,11 @@ class msnbot:
 
 	def _handle_msg(self, email, header, msg):
 		reply = []
-
+		
+		self.recvRing.put([email, header,msg])
+		
 		for f in self.msg_handlers:
-			r = f(email, '', header, msg)
+			r = f(email, header, msg)
 			if r:
 				reply.append(r)
 
@@ -153,7 +167,7 @@ class msnbot:
 	
 	def send_msg(self, email, msg):
 		if email not in self.m.users:
-			return  '%s is not your friend, please add it first' % email
+			return	'%s is not your friend, please add it first' % email
 		
 		if self.m.users[email].status == 'FLN':
 			return '%s is offline, please try later' % email
@@ -175,90 +189,68 @@ class msnbot:
 #
 # Message handlers
 #
+def msn_msg_handler(email, header, msg):
+	return ''
 
-def sample_msg_handler(email, info, header, msg):
-	return "Echo!\n" + '\n'.join(msg)
-	
-# gtalkbot-compatible message handler
-class gtalkbot_msg_handler:
-	def __init__(self, path):
-		self.plugins = []
-		sys.path.insert(0, path)
-		for f in os.listdir(path):
-			if f.endswith('.py'):
-				root, ext = os.path.splitext(f)
-				self.plugins.append(__import__(root))
-		sys.path.pop(0)
-		self.verbs = {}
-
-		for p in self.plugins:
-			for v in p.Verbs():
-				if v not in self.verbs:
-					self.verbs[v] = []
-				self.verbs[v].append(p)
-		print self.verbs
-		self.authenticated_users = []
-
-	def handle_msg(self, email, info, header, msg):
-		# XXX: this only handles the first line
-		vl = msg[0].split(None, 1)
-		if not vl:
-			return
-		if len(vl) < 2:
-			verb, line = vl[0], ''
-		else:
-			verb, line = vl
-
-		if email not in self.authenticated_users and verb != 'auth':
-			return 'You need to authenticate\n' \
-				+ 'Use: auth <password>'
-
-		if verb == 'auth':
-			if line != info:
-				return 'Wrong password, try again'
-			self.authenticated_users.append(email)
-			return 'Welcome!'
-
-		elif verb == 'help':
-			if not line:
-				return 'Use: help <verb>'
-
-			reply = []
-			for p in self.plugins:
-				if 'Help' not in dir(p):
-					continue
-				r = p.Help(line)
-				if r:
-					reply.append(r)
-			if reply:
-				return '\r\n'.join(reply)
-			else:
-				return 'Sorry, no help for ' + line
-
-		elif verb in self.verbs:
-			reply = []
-			for p in self.verbs[verb]:
-				r = p.Command(verb, line)
-				if r:
-					reply.append(r)
-			if reply:
-				return '\r\n'.join(reply)
-			else:
-				return 'Unknown verb'
-
-		else:
-			return 'Unknown verb'
-
-
-	def __call__(self, email, info, header, msg):
-		return self.handle_msg(email, info, header, msg)
 
 def getWho():
 	strwho =  commands.getoutput('who')
 	rawList =  [i.split()[0] for i in strwho.split('\n')]
 	return set(rawList)
+
+def signal_handler(signum, frame):
+	print 'signal', signum
+	sys.exit()
+
+
+def newConn(conn, addr, m):
+	print 'new connect', addr
+	lastEmail = ''
+	while True:
+		try:
+			rs, ws, es  = select.select([conn], [conn], [], 10)
+			for r in rs:
+				data = r.recv(10240)
+				if not data:
+					print 'no data'
+				else:
+					print lastEmail, 'is need'
+					if len(lastEmail) > 0:
+						print m.send_msg(lastEmail, data)
+					else:
+						print 'data:', data
+
+			for r in ws:
+				msg = m.recvRing.get()
+				if msg == None:
+					m.recvRing.wait(1)
+					r.send('None\n')
+				else:
+					lastEmail = msg[0]
+					print lastEmail , 'set'
+					r.send(str(msg[0]) + '\n' + str(msg[1]) + '\n' + str(msg[2]) + '\n')
+
+			if not rs and not ws:
+				print 'timeout'
+		except (Exception), e:
+			print e
+			try:
+				r.close()
+			except (Exception), e1:
+				print e1
+			print 'close the conn!'
+			break
+
 	
 def main():
+	signal.signal(signal.SIGINT,signal_handler)
+	signal.signal(signal.SIGTERM,signal_handler)
+	signal.signal(3,signal_handler)
+	
+	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	s.bind(('127.0.0.1', 9876))
+	s.listen(10)
+	
 
 	# get the login email and password from the parameters
 	try:
@@ -266,26 +258,25 @@ def main():
 		passwd = '123456'
 
 	except:
-		print "Use: msnsbot email password userlist pluginspath"
+		print "Use: msnsbot email password"
 		sys.exit(1)
 
 	b = msnbot(email, passwd)
-	b.register_msg_handler(sample_msg_handler)
+	
+	
+	
+	b.register_msg_handler(msn_msg_handler)
 	b.login()
-	b.register_msg_handler(gtalkbot_msg_handler(os.getcwd() + os.sep + 'plugins'))
 	b.bgloop()
 	
-	preWho = getWho()
-	while True:
-		time.sleep(10)
-		curWho = getWho()
-		if len(curWho) != len(preWho):
-			if len(curWho) > len(preWho):
-				print b.send_msg('msn@zhangwenjin.com', ','.join(curWho - preWho) + ' has login')
-			else:
-				print b.send_msg('msn@zhangwenjin.com', ','.join(preWho - curWho) + ' has logout')
 
-			preWho = curWho
+	
+	while True:
+		rs, ws, es  = select.select([s], [], [])
+	
+		for r in rs:
+			conn, addr = s.accept()
+			threading.Thread(target=newConn, args=(conn, addr, b)).start()
 
 if __name__ == '__main__':
 	main()

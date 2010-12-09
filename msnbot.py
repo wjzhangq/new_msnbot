@@ -11,6 +11,7 @@ import commands
 import traceback
 import signal
 import ringQueue
+import encoder
 
 
 def cur_file_dir():
@@ -55,6 +56,7 @@ class msnbot:
 		self.inp, self.outp = os.pipe()
 		self.inm, self.outm = os.pipe()
 		self.recvRing = ringQueue.ringQueue(20)
+		self.sendLock = threding.Rlock()
 	
 	def _setup(self):
 		self.m = msnlib.msnd()
@@ -172,6 +174,7 @@ class msnbot:
 		if self.m.users[email].status == 'FLN':
 			return '%s is offline, please try later' % email
 		
+		self.sendLock.acquire()
 		os.write(self.outp, email + ':' + msg)
 		r = os.read(self.inm, 1024)
 		if r == '1':
@@ -182,6 +185,8 @@ class msnbot:
 			ret = 'Message too big'
 		else:
 			ret = 'Error %s sending message' % r
+		
+		self.sendLock.release()
 		
 		return ret
 
@@ -205,6 +210,7 @@ def signal_handler(signum, frame):
 
 def newConn(conn, addr, m):
 	print 'new connect', addr
+	json = encoder.JSONEncoder()
 	lastEmail = ''
 	while True:
 		try:
@@ -224,11 +230,11 @@ def newConn(conn, addr, m):
 				msg = m.recvRing.get()
 				if msg == None:
 					m.recvRing.wait(1)
-					r.send('None\n')
+					r.send(json.encode({'type':'None','data':[]}))
 				else:
 					lastEmail = msg[0]
 					print lastEmail , 'set'
-					r.send(str(msg[0]) + '\n' + str(msg[1]) + '\n' + str(msg[2]) + '\n')
+					r.send(json.encode({'type':'msg', 'data':msg}))
 
 			if not rs and not ws:
 				print 'timeout'

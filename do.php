@@ -21,7 +21,26 @@ class sClient{
 			$this->stop = 1;
 		}
 		
-		return $str;
+		$data = json_decode($str);
+		if ($data){
+			$tmp = (array) $data;
+			if (isset($tmp['data'][1])){
+				$tmp['data'][1] = (array) $tmp['data'][1];
+			}
+			$data = $tmp;
+			if (isset($data['data'][1]['Content-Type']) && $data['data'][1]['Content-Type'] == 'text/x-msmsgscontrol'){
+				$data['type'] = 'control';
+			}else{
+				if (isset($data['data'][2])){
+					$data['msg'] = trim($data['data'][2][0]);
+				}
+			}
+		}else{
+			$data = array('type'=>'error', 'data'=>'json decode error:' . $str);
+		}
+
+		
+		return $data;
 	}
 	
 	function send($msg){
@@ -32,11 +51,20 @@ class sClient{
 	}
 }
 
-$n = new sClient('127.0.0.1', 2001);
+$n = new sClient('127.0.0.1', 9876);
 while($n->isWork()){
 	$msg = $n->get();
-	var_dump($msg);
-	$n->send(date('H:i:s'));
+	if ($msg['type'] == 'msg'){
+		if ($msg['msg'] == ''){
+			print_r($msg);
+		}else{
+			var_dump($msg['msg']);
+			$n->send('abc' . $msg['msg']);
+		}
+	}else{
+		//don some thing
+	}
+	
 }
 
 
